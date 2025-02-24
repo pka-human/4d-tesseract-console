@@ -200,29 +200,42 @@ void reinit_screen() {
 }
 
 void calculate_screen_size(unsigned terminal_rows, unsigned terminal_cols) {
-    if (terminal_rows == 0 || terminal_cols == 0) {
-        screen_x = 0;
-        screen_y = 0;
-        return;
-    }
+  if (terminal_rows == 0 || terminal_cols == 0) {
+    screen_x = 0;
+    screen_y = 0;
+    return;
+  }
 
-    if (terminal_rows * PIXEL_ASPECT > 255 && terminal_cols > 255) {
-        screen_x = 255;
-        screen_y = (uint8_t)round(255 * PIXEL_ASPECT);
-        return;
-    }
+  unsigned max_y = terminal_rows < 4 ? 0 : fmin(terminal_rows - 3, 255.0);
+  unsigned max_x = fmin(terminal_cols - 1, 255.0);
 
-    if (terminal_rows < 4) {
-        screen_y = 0;
-    } else {
-        screen_y = terminal_rows - 3;
-    }
+  unsigned potential_x = round(max_y / PIXEL_ASPECT);
+  unsigned potential_y = round(max_x * PIXEL_ASPECT);
 
-    screen_x = (uint8_t)round(screen_y / PIXEL_ASPECT);
-
-    if (screen_x >= terminal_cols) {
-        screen_x = terminal_cols - 1;
-        screen_y = (uint8_t)round(screen_x * PIXEL_ASPECT);
+  if (potential_x <= max_x && potential_y <= max_y)
+   {
+    screen_x = (uint8_t) potential_x;
+    screen_y = (uint8_t) potential_y;
+   } 
+  else if (potential_x <= max_x)
+   {
+      screen_x = (uint8_t) potential_x;
+      screen_y = (uint8_t) fmin(round(screen_x * PIXEL_ASPECT), max_y);
+   }
+  else if(potential_y <= max_y)
+  {
+    screen_y = (uint8_t) potential_y;
+    screen_x = (uint8_t) fmin(round(screen_y / PIXEL_ASPECT), max_x);
+  }
+  else 
+   {
+        if (potential_x > max_x) {
+            screen_x = (uint8_t)max_x;
+            screen_y = (uint8_t)fmin(round(screen_x * PIXEL_ASPECT), max_y);
+        } else {
+            screen_y = (uint8_t)max_y;
+            screen_x = (uint8_t)fmin(round(screen_y / PIXEL_ASPECT), max_x);
+        }
     }
 }
 
