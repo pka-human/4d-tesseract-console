@@ -16,6 +16,9 @@
 #include <fcntl.h>
 #endif
 
+const char gradient[] = "@&Xx+;:,. ";
+size_t gradient_size;
+
 typedef struct {
     uint8_t x, y;
 } Vector2;
@@ -165,28 +168,25 @@ float get_char_aspect_ratio() {
     return (float)height / width;
 }
 
-void set_bit(uint8_t x, uint8_t y, bool value) {
-    uint16_t pos = y * screen_x + x;
-    uint16_t byte_idx = pos / 8;
-    uint8_t bit_offset = pos % 8;
-
-    if (value) {
-        screen[byte_idx] |= (1 << (7 - bit_offset));
+void set_pixel(int x, int y, uint8_t value) {
+    if (x >= 0 && x < screen_x && y >= 0 && y < screen_y) {
+        screen[y * screen_x + x] = value;
     } else {
-        screen[byte_idx] &= ~(1 << (7 - bit_offset));
+        fprintf(stderr, "Error: Coordinates (%d, %d) are out of bounds!\n", x, y);
+        exit(1);
+    }
+}
+uint8_t get_pixel(int x, int y) {
+    if (x >= 0 && x < screen_x && y >= 0 && y < screen_y) {
+        return screen[y * screen_x + x];
+    } else {
+        fprintf(stderr, "Error: Coordinates (%d, %d) are out of bounds!\n", x, y);
+        exit(1);
     }
 }
 
-bool get_bit(uint8_t x, uint8_t y) {
-    uint16_t pos = y * screen_x + x;
-    uint16_t byte_idx = pos / 8;
-    uint8_t bit_offset = pos % 8;
-    return (screen[byte_idx] >> (7 - bit_offset)) & 1;
-}
-
 void init_screen() {
-    size_t bytes_needed = (screen_x * screen_y + 7) / 8;
-    screen = (uint8_t*)malloc(bytes_needed);
+    screen = (uint8_t*)malloc(screen_x * screen_y * sizeof(uint8_t));
     if (screen == NULL) {
         fprintf(stderr, "Error: Failed to allocate memory for screen!\n");
         exit(1);
@@ -252,8 +252,7 @@ void free_all() {
 }
 
 void clear_screen() {
-    size_t bytes = (screen_x * screen_y + 7) / 8;
-    memset(screen, 0, bytes);
+    memset(screen, gradient_size - 1, screen_x * screen_y * sizeof(uint8_t));
 }
 
 void reallocate_drawings_buffer() {
@@ -364,146 +363,197 @@ void line(Vector4 point_a, Vector4 point_b) {
     }
 }
 
-Vector4 rotateXY(Vector4 v, float angle) {
+void rotateXY(Vector4 *v, float angle) {
     float cosA = cosf(angle);
     float sinA = sinf(angle);
-    return (Vector4){ 
-        v.x * cosA - v.y * sinA, 
-        v.x * sinA + v.y * cosA, 
-        v.z, 
-        v.w 
-    };
+    float x = v->x * cosA - v->y * sinA;
+    float y = v->x * sinA + v->y * cosA;
+    v->x = (int8_t)roundf(x);
+    v->y = (int8_t)roundf(y);
 }
 
-Vector4 rotateXZ(Vector4 v, float angle) {
+void rotateXZ(Vector4 *v, float angle) {
     float cosA = cosf(angle);
     float sinA = sinf(angle);
-    return (Vector4){ 
-        v.x * cosA - v.z * sinA, 
-        v.y, 
-        v.x * sinA + v.z * cosA, 
-        v.w 
-    };
+    float x = v->x * cosA - v->z * sinA;
+    float z = v->x * sinA + v->z * cosA;
+    v->x = (int8_t)roundf(x);
+    v->z = (int8_t)roundf(z);
 }
 
-Vector4 rotateXW(Vector4 v, float angle) {
+void rotateXW(Vector4 *v, float angle) {
     float cosA = cosf(angle);
     float sinA = sinf(angle);
-    return (Vector4){ 
-        v.x * cosA - v.w * sinA, 
-        v.y, 
-        v.z, 
-        v.x * sinA + v.w * cosA 
-    };
+    float x = v->x * cosA - v->w * sinA;
+    float w = v->x * sinA + v->w * cosA;
+    v->x = (int8_t)roundf(x);
+    v->w = (int8_t)roundf(w);
 }
 
-Vector4 rotateYZ(Vector4 v, float angle) {
+void rotateYZ(Vector4 *v, float angle) {
     float cosA = cosf(angle);
     float sinA = sinf(angle);
-    return (Vector4){ 
-        v.x, 
-        v.y * cosA - v.z * sinA, 
-        v.y * sinA + v.z * cosA, 
-        v.w 
-    };
+    float y = v->y * cosA - v->z * sinA;
+    float z = v->y * sinA + v->z * cosA;
+    v->y = (int8_t)roundf(y);
+    v->z = (int8_t)roundf(z);
 }
 
-Vector4 rotateYW(Vector4 v, float angle) {
+void rotateYW(Vector4 *v, float angle) {
     float cosA = cosf(angle);
     float sinA = sinf(angle);
-    return (Vector4){ 
-        v.x, 
-        v.y * cosA - v.w * sinA, 
-        v.z, 
-        v.y * sinA + v.w * cosA 
-    };
+    float y = v->y * cosA - v->w * sinA;
+    float w = v->y * sinA + v->w * cosA;
+    v->y = (int8_t)roundf(y);
+    v->w = (int8_t)roundf(w);
 }
 
-Vector4 rotateZW(Vector4 v, float angle) {
+void rotateZW(Vector4 *v, float angle) {
     float cosA = cosf(angle);
     float sinA = sinf(angle);
-    return (Vector4){ 
-        v.x, 
-        v.y, 
-        v.z * cosA - v.w * sinA, 
-        v.z * sinA + v.w * cosA 
-    };
+    float z = v->z * cosA - v->w * sinA;
+    float w = v->z * sinA + v->w * cosA;
+    v->z = (int8_t)roundf(z);
+    v->w = (int8_t)roundf(w);
 }
 
 void rotate_world_XY(float theta) {
     for (size_t i = 0; i < drawings_size; ++i) {
-        drawings[i].a = rotateXY(drawings[i].a, theta);
-        drawings[i].b = rotateXY(drawings[i].b, theta);
+        rotateXY(&drawings[i].a, theta);
+        rotateXY(&drawings[i].b, theta);
     }
 }
 
 void rotate_world_XZ(float theta) {
     for (size_t i = 0; i < drawings_size; ++i) {
-        drawings[i].a = rotateXZ(drawings[i].a, theta);
-        drawings[i].b = rotateXZ(drawings[i].b, theta);
+        rotateXZ(&drawings[i].a, theta);
+        rotateXZ(&drawings[i].b, theta);
     }
 }
 
 void rotate_world_XW(float theta) {
     for (size_t i = 0; i < drawings_size; ++i) {
-        drawings[i].a = rotateXW(drawings[i].a, theta);
-        drawings[i].b = rotateXW(drawings[i].b, theta);
+        rotateXW(&drawings[i].a, theta);
+        rotateXW(&drawings[i].b, theta);
     }
 }
 
 void rotate_world_YZ(float theta) {
     for (size_t i = 0; i < drawings_size; ++i) {
-        drawings[i].a = rotateYZ(drawings[i].a, theta);
-        drawings[i].b = rotateYZ(drawings[i].b, theta);
+        rotateYZ(&drawings[i].a, theta);
+        rotateYZ(&drawings[i].b, theta);
     }
 }
 
 void rotate_world_YW(float theta) {
     for (size_t i = 0; i < drawings_size; ++i) {
-        drawings[i].a = rotateYW(drawings[i].a, theta);
-        drawings[i].b = rotateYW(drawings[i].b, theta);
+        rotateYW(&drawings[i].a, theta);
+        rotateYW(&drawings[i].b, theta);
     }
 }
 
 void rotate_world_ZW(float theta) {
     for (size_t i = 0; i < drawings_size; ++i) {
-        drawings[i].a = rotateZW(drawings[i].a, theta);
-        drawings[i].b = rotateZW(drawings[i].b, theta);
+        rotateZW(&drawings[i].a, theta);
+        rotateZW(&drawings[i].b, theta);
     }
 }
 
-void draw_line2d(Vector2 point_a, Vector2 point_b) {
-    int dx = abs(point_b.x - point_a.x);
-    int dy = abs(point_b.y - point_a.y);
-    int sx = (point_a.x < point_b.x) ? 1 : -1;
-    int sy = (point_a.y < point_b.y) ? 1 : -1;
-    int err = dx - dy;
-    int e2;
+void set_2d_gradient_point(unsigned x, unsigned y, int z) {
+    z = z < -100 ? -100 : (z > 100 ? 100 : z);
+    float normalized_z = (float)(z + 100) / 200.0f;
+    int index = (int)(normalized_z * (gradient_size - 1));
+    index = index < 0 ? 0 : (index >= gradient_size ? gradient_size - 1 : index);
 
-    while (true) {
-        if (point_a.x >= 0 && point_a.x < screen_x && point_a.y >= 0 && point_a.y < screen_y) {
-            set_bit(point_a.x, point_a.y, true);
-        }
+    int current_index = get_pixel(x, y);
+    if (index < current_index) {
+        set_pixel(x, y, index);
+    }
+}
 
-        if (point_a.x == point_b.x && point_a.y == point_b.y)
-            break;
+void draw_line2d_with_depth(Vector2 point_a, Vector2 point_b, int8_t z_a, int8_t z_b) {
+    int x0 = (int)round(point_a.x);
+    int y0 = (int)round(point_a.y);
+    int z0 = (int)round(z_a);
+    int x1 = (int)round(point_b.x);
+    int y1 = (int)round(point_b.y);
+    int z1 = (int)round(z_b);
 
-        e2 = 2 * err;
-        if (e2 > -dy) {
-            err -= dy;
-            point_a.x += sx;
-        }
-        if (e2 < dx) {
-            err += dx;
-            point_a.y += sy;
-        }
+    set_2d_gradient_point(x0, y0, z0);
 
-        if (e2 <= -dy && e2 >= dx) {
-            if (dx > dy) {
-                point_a.x += sx;
-            } else {
-                point_a.y += sy;
+    int dx = abs(x1 - x0);
+    int dy = abs(y1 - y0);
+    int dz = abs(z1 - z0);
+    int xs;
+    int ys;
+    int zs;
+    if (x1 > x0)
+        xs = 1;
+    else
+        xs = -1;
+    if (y1 > y0)
+        ys = 1;
+    else
+        ys = -1;
+    if (z1 > z0)
+        zs = 1;
+    else
+        zs = -1;
+
+    // X
+    if (dx >= dy && dx >= dz) {
+        int p1 = 2 * dy - dx;
+        int p2 = 2 * dz - dx;
+        while (x0 != x1) {
+            x0 += xs;
+            if (p1 >= 0) {
+                y0 += ys;
+                p1 -= 2 * dx;
             }
+            if (p2 >= 0) {
+                z0 += zs;
+                p2 -= 2 * dx;
+            }
+            p1 += 2 * dy;
+            p2 += 2 * dz;
+            set_2d_gradient_point(x0, y0, z0);
+        }
+    }
+    // Y
+    else if (dy >= dx && dy >= dz) {
+        int p1 = 2 * dx - dy;
+        int p2 = 2 * dz - dy;
+        while (y0 != y1) {
+            y0 += ys;
+            if (p1 >= 0) {
+                x0 += xs;
+                p1 -= 2 * dy;
+            }
+            if (p2 >= 0) {
+                z0 += zs;
+                p2 -= 2 * dy;
+            }
+            p1 += 2 * dx;
+            p2 += 2 * dz;
+            set_2d_gradient_point(x0, y0, z0);
+        }
+        // Z
+    } else {
+        int p1 = 2 * dy - dz;
+        int p2 = 2 * dx - dz;
+        while (z0 != z1) {
+            z0 += zs;
+            if (p1 >= 0) {
+                y0 += ys;
+                p1 -= 2 * dz;
+            }
+            if (p2 >= 0) {
+                x0 += xs;
+                p2 -= 2 * dz;
+            }
+            p1 += 2 * dy;
+            p2 += 2 * dx;
+            set_2d_gradient_point(x0, y0, z0);
         }
     }
 }
@@ -528,7 +578,7 @@ void draw(bool perspective, float fov_degrees, float zoom) {
         Vector3 projected_b = project4d3d(perspective, d.b, fov_degrees, zoom);
         Vector2 draw_point_a = project3d2d(perspective, projected_a, fov_degrees, zoom);
         Vector2 draw_point_b = project3d2d(perspective, projected_b, fov_degrees, zoom);
-        draw_line2d(draw_point_a, draw_point_b);
+        draw_line2d_with_depth(draw_point_a, draw_point_b, projected_a.z, projected_b.z);
     }
 
     char line_buf[screen_x + 3]; 
@@ -536,7 +586,7 @@ void draw(bool perspective, float fov_degrees, float zoom) {
     for (uint8_t yp = 0; yp < screen_y; ++yp) {
         size_t pos = 0;
         for (uint8_t xp = 0; xp < screen_x; ++xp) {
-            line_buf[pos++] = get_bit(xp, yp) ? '@' : ' ';
+            line_buf[pos++] = gradient[get_pixel(xp, yp)];
         }
         line_buf[pos++] = '|';
         line_buf[pos++] = '\n';
@@ -601,6 +651,8 @@ int main() {
     tesseract(50); // tesseract, size 50.
 
     allocate_drawings();
+
+    gradient_size = sizeof(gradient) / sizeof(gradient[0]) - 1;
 
     bool perspective = true;
     float fov_degrees = 60.0f;
