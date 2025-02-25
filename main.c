@@ -252,9 +252,7 @@ bool update_screen_size() {
 void free_all() {
     free(drawings);
     free(drawings_buffer);
-    drawings = NULL;
-    drawings_buffer = NULL;
-    drawings_size = 0;
+    free(screen);
 }
 
 void clear_screen() {
@@ -650,7 +648,9 @@ int main() {
     update_screen_size();
     init_screen();
 
-    long long previous_time;
+    long long previous_time = get_microseconds();
+    long long current_time;
+    float deltaTime;
 
     float rotation = 0;
 
@@ -665,13 +665,15 @@ int main() {
     float zoom = 0.8f;
 
     while (1) {
-        previous_time = get_microseconds();
+        current_time = get_microseconds();
+        deltaTime = (current_time - previous_time) / 1000000.0f; // Convert microseconds to seconds
+        previous_time = current_time;
 
         memcpy(drawings, drawings_buffer, drawings_size * sizeof(drawing));
 
         rotate_world_XZ(rotation);
         rotate_world_YW(rotation);
-        
+
         if (update_screen_size()) {
             reinit_screen();
             #ifdef _WIN32
@@ -682,9 +684,9 @@ int main() {
         clear_terminal();
         draw(perspective, fov_degrees, zoom);
 
-        rotation += 0.008f;
+        rotation += 0.008f * (deltaTime * 60.0f); // Adjust speed based on deltaTime
 
-        long long sleep = 10000 - (get_microseconds() - previous_time);
+        long long sleep = 500000 - (get_microseconds() - current_time);
         if (sleep > 0) {
             usleep(sleep);
         }
@@ -693,4 +695,5 @@ int main() {
     free_all();
     return 0;
 }
+
 
