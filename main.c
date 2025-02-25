@@ -176,6 +176,7 @@ void set_pixel(int x, int y, uint8_t value) {
         exit(1);
     }
 }
+
 uint8_t get_pixel(int x, int y) {
     if (x >= 0 && x < screen_x && y >= 0 && y < screen_y) {
         return screen[y * screen_x + x];
