@@ -96,7 +96,6 @@ void clear_terminal() {
 float get_char_aspect_ratio() {
     unsigned height = 5;
     unsigned width = height;
-    float aspect_ratio = 1.0;
     int ch;
     bool changed = true;
 
