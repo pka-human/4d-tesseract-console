@@ -686,7 +686,7 @@ int main() {
 
         rotation += 0.008f * (deltaTime * 60.0f); // Adjust speed based on deltaTime
 
-        long long sleep = 500000 - (get_microseconds() - current_time);
+        long long sleep = 10000 - (get_microseconds() - current_time);
         if (sleep > 0) {
             usleep(sleep);
         }
