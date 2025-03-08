@@ -1,7 +1,7 @@
 # 4d-tesseract-console
 4D animated tesseract in console, written in C.
 
-![screenshot](tesseract.png)
+![animation](tesseract.gif)
 
 Compile with CLANG:
 ```bash
