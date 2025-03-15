@@ -198,42 +198,8 @@ void reinit_screen() {
     init_screen();
 }
 
-void calculate_screen_size(unsigned terminal_rows, unsigned terminal_cols) {
-    if (terminal_rows == 0 || terminal_cols == 0) {
-        screen_x = 0;
-        screen_y = 0;
-        return;
-    }
-
-    unsigned max_y = terminal_rows < 4 ? 0 : fmin(terminal_rows - 3, 255.0);
-    unsigned max_x = fmin(terminal_cols - 1, 255.0);
-
-    unsigned potential_x = round(max_y / PIXEL_ASPECT);
-    unsigned potential_y = round(max_x * PIXEL_ASPECT);
-
-    if (potential_x <= max_x && potential_y <= max_y) {
-        screen_x = (uint8_t) potential_x;
-        screen_y = (uint8_t) potential_y;
-    } else if (potential_x <= max_x) {
-        screen_x = (uint8_t) potential_x;
-        screen_y = (uint8_t) fmin(round(screen_x * PIXEL_ASPECT), max_y);
-    } else if(potential_y <= max_y) {
-        screen_y = (uint8_t) potential_y;
-        screen_x = (uint8_t) fmin(round(screen_y / PIXEL_ASPECT), max_x);
-    } else {
-        if (potential_x > max_x) {
-            screen_x = (uint8_t)max_x;
-            screen_y = (uint8_t)fmin(round(screen_x * PIXEL_ASPECT), max_y);
-        } else {
-            screen_y = (uint8_t)max_y;
-            screen_x = (uint8_t)fmin(round(screen_y / PIXEL_ASPECT), max_x);
-        }
-    }
-}
-
 bool update_screen_size() {
     unsigned terminal_rows, terminal_cols;
-
     get_terminal_size(&terminal_rows, &terminal_cols);
 
     if (terminal_rows == previous_rows && terminal_cols == previous_cols) {
@@ -243,7 +209,28 @@ bool update_screen_size() {
     previous_rows = terminal_rows;
     previous_cols = terminal_cols;
 
-    calculate_screen_size(terminal_rows, terminal_cols);
+    if (terminal_rows == 0 || terminal_cols == 0) {
+        screen_x = 0;
+        screen_y = 0;
+        return false;
+    }
+
+    unsigned max_y = (terminal_rows < 4) ? 0 : (terminal_rows - 3);
+    unsigned max_x = terminal_cols - 1;
+
+    unsigned potential_x = (unsigned) round(max_y / PIXEL_ASPECT);
+    unsigned potential_y = (unsigned) round(max_x * PIXEL_ASPECT);
+
+    if (potential_x <= max_x && potential_y <= max_y) {
+        screen_x = (uint8_t) potential_x;
+        screen_y = (uint8_t) potential_y;
+    } else if (potential_x <= max_x) {
+        screen_x = (uint8_t) potential_x;
+        screen_y = (uint8_t) fmin(round(screen_x * PIXEL_ASPECT), max_y);
+    } else {
+        screen_y = (uint8_t) fmin(round(max_x * PIXEL_ASPECT), max_y);
+        screen_x = (uint8_t) fmin(round(screen_y / PIXEL_ASPECT), max_x);
+    }
 
     return true;
 }
@@ -258,21 +245,21 @@ void clear_screen() {
     memset(screen, gradient_size - 1, screen_x * screen_y * sizeof(uint8_t));
 }
 
-void reallocate_drawings_buffer() {
-    drawings_buffer = (drawing*) realloc(drawings_buffer, (++drawings_size) * sizeof(drawing));
-    if (drawings_buffer == NULL) {
-        fprintf(stderr, "Error: Failed to reallocate memory for drawings_buffer!\n");
+void reallocate_drawings() {
+    drawings = (drawing*) realloc(drawings, (++drawings_size) * sizeof(drawing));
+    if (drawings == NULL) {
+        fprintf(stderr, "Error: Failed to reallocate memory for drawings!\n");
         exit(1);
     }
 }
 
-void allocate_drawings() {
-    if (drawings != NULL) {
+void allocate_drawings_buffer() {
+    if (drawings_buffer != NULL) {
         return;
     }
-    drawings = (drawing*) malloc(drawings_size * sizeof(drawing));
-    if (drawings == NULL) {
-        fprintf(stderr, "Error: Failed to allocate memory for drawings!\n");
+    drawings_buffer = (drawing*) malloc(drawings_size * sizeof(drawing));
+    if (drawings_buffer == NULL) {
+        fprintf(stderr, "Error: Failed to allocate memory for drawings buffer!\n");
         exit(1);
     }
 }
@@ -337,9 +324,34 @@ Vector3 project4d3d(bool is_perspective, Vector4 point, float fov_degrees, float
         }
     }
 
-    result.x = (float)point.x * scale;
-    result.y = (float)point.y * scale;
-    result.z = (float)point.z * scale;
+    float result_x = (float)point.x * scale;
+    float result_y = (float)point.y * scale;
+    float result_z = (float)point.z * scale;
+
+    if (result_x > 127) {
+        result.x = 127;
+    } else if (result_x < -128) {
+        result.x = -128;
+    } else {
+        result.x = result_x;
+    }
+
+    if (result_y > 127) {
+        result.y = 127;
+    } else if (result_y < -128) {
+        result.y = -128;
+    } else {
+        result.y = result_y;
+    }
+
+
+    if (result_z > 127) {
+        result.z = 127;
+    } else if (result_z < -128) {
+        result.z = -128;
+    } else {
+        result.z = result_z;
+    }
 
     return result;
 }
@@ -354,9 +366,9 @@ void line(Vector4 point_a, Vector4 point_b) {
         point_b.z >= -100 && point_b.z <= 100 &&
         point_b.w >= -100 && point_b.w <= 100) {
 
-        reallocate_drawings_buffer();
+        reallocate_drawings();
 
-        drawings_buffer[drawings_size - 1] = (drawing) {
+        drawings[drawings_size - 1] = (drawing) {
             .a = point_a,
             .b = point_b
         };
@@ -422,43 +434,43 @@ void rotateZW(Vector4 *v, float angle) {
 
 void rotate_world_XY(float theta) {
     for (size_t i = 0; i < drawings_size; ++i) {
-        rotateXY(&drawings[i].a, theta);
-        rotateXY(&drawings[i].b, theta);
+        rotateXY(&drawings_buffer[i].a, theta);
+        rotateXY(&drawings_buffer[i].b, theta);
     }
 }
 
 void rotate_world_XZ(float theta) {
     for (size_t i = 0; i < drawings_size; ++i) {
-        rotateXZ(&drawings[i].a, theta);
-        rotateXZ(&drawings[i].b, theta);
+        rotateXZ(&drawings_buffer[i].a, theta);
+        rotateXZ(&drawings_buffer[i].b, theta);
     }
 }
 
 void rotate_world_XW(float theta) {
     for (size_t i = 0; i < drawings_size; ++i) {
-        rotateXW(&drawings[i].a, theta);
-        rotateXW(&drawings[i].b, theta);
+        rotateXW(&drawings_buffer[i].a, theta);
+        rotateXW(&drawings_buffer[i].b, theta);
     }
 }
 
 void rotate_world_YZ(float theta) {
     for (size_t i = 0; i < drawings_size; ++i) {
-        rotateYZ(&drawings[i].a, theta);
-        rotateYZ(&drawings[i].b, theta);
+        rotateYZ(&drawings_buffer[i].a, theta);
+        rotateYZ(&drawings_buffer[i].b, theta);
     }
 }
 
 void rotate_world_YW(float theta) {
     for (size_t i = 0; i < drawings_size; ++i) {
-        rotateYW(&drawings[i].a, theta);
-        rotateYW(&drawings[i].b, theta);
+        rotateYW(&drawings_buffer[i].a, theta);
+        rotateYW(&drawings_buffer[i].b, theta);
     }
 }
 
 void rotate_world_ZW(float theta) {
     for (size_t i = 0; i < drawings_size; ++i) {
-        rotateZW(&drawings[i].a, theta);
-        rotateZW(&drawings[i].b, theta);
+        rotateZW(&drawings_buffer[i].a, theta);
+        rotateZW(&drawings_buffer[i].b, theta);
     }
 }
 
@@ -576,7 +588,7 @@ void draw(bool perspective, float fov_degrees, float zoom) {
     printf("4D Tesseract in console. (Ctrl + C to quit)\nWritten in C by pka_human, 2025.\n");
 
     for (size_t i = 0; i < drawings_size; ++i) {
-        drawing d = drawings[i];
+        drawing d = drawings_buffer[i];
         Vector3 projected_a = project4d3d(perspective, d.a, fov_degrees, zoom);
         Vector3 projected_b = project4d3d(perspective, d.b, fov_degrees, zoom);
         Vector2 draw_point_a = project3d2d(perspective, projected_a, fov_degrees, zoom);
@@ -655,7 +667,7 @@ int main() {
 
     tesseract(50); // tesseract, size 50.
 
-    allocate_drawings();
+    allocate_drawings_buffer();
 
     gradient_size = sizeof(gradient) / sizeof(gradient[0]) - 1;
 
@@ -668,7 +680,7 @@ int main() {
         deltaTime = (current_time - previous_time) / 1000000.0f; // Convert microseconds to seconds
         previous_time = current_time;
 
-        memcpy(drawings, drawings_buffer, drawings_size * sizeof(drawing));
+        memcpy(drawings_buffer, drawings, drawings_size * sizeof(drawing));
 
         rotate_world_XZ(rotation);
         rotate_world_YW(rotation);
