@@ -88,7 +88,7 @@ void clear_terminal() {
     Position.Y = 0;
     SetConsoleCursorPosition(hOut, Position);
 #else
-    printf("\033[2J\033[H");
+    fputs("\033[2J\033[H", stdout);
 #endif
 }
 
@@ -119,7 +119,7 @@ float get_char_aspect_ratio() {
             #else
                 clear_terminal();
             #endif
-            printf("Use left/right arrow keys to adjust\nthe width until it looks like a square.\nPress Enter when it's right.\n\n");
+            fputs("Use left/right arrow keys to adjust\nthe width until it looks like a square.\nPress Enter when it's right.\n\n", stdout);
 
             for (unsigned i = 0; i < height; ++i) {
                 for (unsigned j = 0; j < width; ++j) {
@@ -581,11 +581,11 @@ void draw(bool perspective, float fov_degrees, float zoom) {
     }
 
     if (previous_cols <= 38 || previous_rows <= 15) {
-        printf("Too small :(\n");
+        fputs("Too small :(\n", stdout);
         return;
     }
 
-    printf("4D Tesseract in console. (Ctrl + C to quit)\nWritten in C by pka_human, 2025.\n");
+    fputs("4D Tesseract in console. (Ctrl + C to quit)\nWritten in C by pka_human, 2025.\n", stdout);
 
     for (size_t i = 0; i < drawings_size; ++i) {
         drawing d = drawings_buffer[i];
@@ -606,7 +606,7 @@ void draw(bool perspective, float fov_degrees, float zoom) {
         line_buf[pos++] = '|';
         line_buf[pos++] = '\n';
         line_buf[pos] = '\0';
-        printf("%s", line_buf);
+        fputs(line_buf, stdout);
     }
 }
 
@@ -695,7 +695,7 @@ int main() {
         clear_terminal();
         draw(perspective, fov_degrees, zoom);
 
-        rotation += 0.008f * (deltaTime * 60.0f); // Adjust speed based on deltaTime
+        rotation += 0.01f * (deltaTime * 60.0f); // Adjust speed based on deltaTime
 
         long long sleep = 10000 - (get_microseconds() - current_time);
         if (sleep > 0) {
