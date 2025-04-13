@@ -695,7 +695,7 @@ int main() {
         clear_terminal();
         draw(perspective, fov_degrees, zoom);
 
-        rotation += 0.01f * (deltaTime * 60.0f); // Adjust speed based on deltaTime
+        rotation += 0.013f * (deltaTime * 60.0f); // Adjust speed based on deltaTime
 
         long long sleep = 10000 - (get_microseconds() - current_time);
         if (sleep > 0) {
